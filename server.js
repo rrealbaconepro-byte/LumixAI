@@ -1,13 +1,15 @@
 const express = require("express");
+const multer = require("multer");
 const path = require("path");
 
 const app = express();
+const upload = multer({ storage: multer.memoryStorage() });
+
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
 app.use(express.static(__dirname));
 
-// Memory
+let memory = [];
 let knowledge = 0;
 
 // Open website
@@ -15,29 +17,33 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Chat endpoint
-app.post("/chat", async (req, res) => {
+// Chat
+app.post("/chat", upload.single("image"), async (req, res) => {
   const message = (req.body.message || "").trim();
   const text = message.toLowerCase();
+
+  // Save memory
+  if (message) memory.push(message);
+
+  // Image received
+  if (req.file) {
+    return res.json({
+      reply:
+        "I received your image. Image understanding requires a vision AI model, but the upload worked successfully."
+    });
+  }
 
   // Greetings
   if (["hi", "hello", "hey"].includes(text)) {
     return res.json({
-      reply: "Hello! 👋 I'm LumixAI. How can I help you?"
+      reply: "Hello! I'm LumixAI. How can I help you today?"
     });
   }
 
   // Identity
   if (text.includes("who are you")) {
     return res.json({
-      reply: "I'm LumixAI, an AI assistant built with JavaScript."
-    });
-  }
-
-  // ChatGPT
-  if (text === "chatgpt") {
-    return res.json({
-      reply: "ChatGPT is an AI assistant created by OpenAI. I'm LumixAI."
+      reply: "I'm LumixAI, your JavaScript AI assistant."
     });
   }
 
@@ -47,44 +53,51 @@ app.post("/chat", async (req, res) => {
     knowledge += amount;
 
     return res.json({
-      reply: `📚 Learned ${amount} knowledge pages. Total: ${knowledge}.`
+      reply: `📚 Learning complete. Total knowledge: ${knowledge} pages.`
     });
   }
 
-  // Knowledge count
+  // Memory count
   if (text === "knowledge") {
     return res.json({
-      reply: `I currently have ${knowledge} learned knowledge pages.`
+      reply: `I currently remember ${knowledge} learned pages.`
     });
   }
 
-  // Internet lookup (Wikipedia)
-  try {
-    const url =
-      "https://en.wikipedia.org/api/rest_v1/page/summary/" +
-      encodeURIComponent(message);
+  // Internet search using Wikipedia
+  if (message.length > 0) {
+    try {
+      const url =
+        "https://en.wikipedia.org/api/rest_v1/page/summary/" +
+        encodeURIComponent(message);
 
-    const response = await fetch(url);
+      const response = await fetch(url);
 
-    if (response.ok) {
-      const data = await response.json();
+      if (response.ok) {
+        const data = await response.json();
 
-      if (data.extract) {
-        return res.json({
-          reply: data.extract
-        });
+        if (data.extract) {
+          return res.json({
+            reply: data.extract
+          });
+        }
       }
-    }
-  } catch (err) {
-    console.log(err);
+    } catch (e) {}
   }
 
-  // Default reply
+  // Default
   return res.json({
-    reply: "Sorry, I couldn't find information about that."
+    reply:
+      "I couldn't find information on that. Try asking in a different way."
   });
 });
 
+// New chat
+app.post("/newchat", (req, res) => {
+  memory = [];
+  res.json({ success: true });
+});
+
 app.listen(PORT, () => {
-  console.log(`LumixAI is running on port ${PORT}`);
+  console.log(`🤖 LumixAI running on port ${PORT}`);
 });
