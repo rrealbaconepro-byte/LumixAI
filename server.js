@@ -7,9 +7,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(__dirname));
 
-let chats = [];
-let knowledge = [];
-
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
@@ -17,50 +14,31 @@ app.get("/", (req, res) => {
 app.post("/chat", async (req, res) => {
   const message = (req.body.message || "").trim();
 
-  chats.push({ role: "user", content: message });
+  try {
+    const url =
+      "https://en.wikipedia.org/api/rest_v1/page/summary/" +
+      encodeURIComponent(message);
 
-  if (message.toLowerCase() === "new chat") {
-    chats = [];
-    return res.json({ reply: "New chat created." });
-  }
+    const response = await fetch(url);
 
-  if (message.toLowerCase().startsWith("learn ")) {
-    const amount = parseInt(message.split(" ")[1]) || 0;
+    if (response.ok) {
+      const data = await response.json();
 
-    for (let i = 0; i < amount; i++) {
-      knowledge.push(`Knowledge page ${knowledge.length + 1}`);
+      return res.json({
+        reply: data.extract || "I couldn't find information."
+      });
     }
 
-    return res.json({
-      reply: `LumixAI learned ${amount} knowledge items. Total: ${knowledge.length}.`
+    res.json({
+      reply: "I couldn't find information on the internet."
+    });
+  } catch (err) {
+    res.json({
+      reply: "Internet search failed."
     });
   }
-
-  if (message.toLowerCase() === "knowledge") {
-    return res.json({
-      reply: `Stored knowledge: ${knowledge.length} items.`
-    });
-  }
-
-  if (message.toLowerCase().startsWith("image ")) {
-    return res.json({
-      reply: "Image generation requires an image model. This server cannot generate real images by itself."
-    });
-  }
-
-  if (message.toLowerCase().startsWith("file ")) {
-    return res.json({
-      reply: "File generation requires document creation code. This is the command router."
-    });
-  }
-
-  const reply = `I received: "${message}"`;
-
-  chats.push({ role: "assistant", content: reply });
-
-  res.json({ reply });
 });
 
 app.listen(PORT, () => {
-  console.log(`LumixAI running on port ${PORT}`);
+  console.log(`LumixAI running on ${PORT}`);
 });
